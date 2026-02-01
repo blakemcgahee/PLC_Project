@@ -40,15 +40,51 @@ public final class Lexer {
      * by {@link #lex()}
      */
     public Token lexToken() {
-        throw new UnsupportedOperationException(); //TODO
+        // Identifier: starts with letter or underscore
+        if (peek("[A-Za-z_]")) {
+            return lexIdentifier();
+        }
+        // Number: starts with +/- followed by digit, or just a digit
+        else if (peek("[+-]", "[0-9]") || peek("[0-9]")) {
+            return lexNumber();
+        }
+        // Character: starts with single quote '
+        else if (peek("'")) {
+            return lexCharacter();
+        }
+        // String: starts with double quote "
+        else if (peek("\"")) {
+            return lexString();
+        }
+        // Everything else is an operator
+        else {
+            return lexOperator();
+        }
     }
 
     public Token lexIdentifier() {
-        throw new UnsupportedOperationException(); //TODO
+        // Match first character: letter or underscore
+        if (!match("[A-Za-z_]")) {
+            throw new ParseException("Identifier must start with a letter or underscore", chars.index);
+        }
+
+        // Keep matching: letters, digits, underscores, or hyphens
+        while (match("[A-Za-z0-9_-]")) {
+            // Just keep consuming characters
+        }
+
+        // Emit the IDENTIFIER token
+        return chars.emit(Token.Type.IDENTIFIER);
     }
 
+    // Stubbed
     public Token lexNumber() {
-        throw new UnsupportedOperationException(); //TODO
+        // Temporary stub - just match any digits and optional sign
+        match("[+-]");  // optional sign
+        while (match("[0-9]")) {
+            // consume digits
+        }
+        return chars.emit(Token.Type.INTEGER);
     }
 
     public Token lexCharacter() {
@@ -63,8 +99,14 @@ public final class Lexer {
         throw new UnsupportedOperationException(); //TODO
     }
 
+    //Stubbed
     public Token lexOperator() {
-        throw new UnsupportedOperationException(); //TODO
+        // Match any single character as an operator
+        if (chars.has(0)) {
+            chars.advance();
+            return chars.emit(Token.Type.OPERATOR);
+        }
+        throw new ParseException("No character to lex as operator", chars.index);
     }
 
     /**
