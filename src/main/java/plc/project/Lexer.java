@@ -124,15 +124,62 @@ public final class Lexer {
     }
 
     public Token lexCharacter() {
-        throw new UnsupportedOperationException(); //TODO
+        // Must start with single quote
+        if (!match("'")) {
+            throw new ParseException("Character must start with '", chars.index);
+        }
+
+        // Check for escape or regular character
+        if (peek("\\\\")) {
+            lexEscape();
+        } else if (peek("[^'\\n\\r\\\\]")) {
+            // Any character except ', newline, or backslash
+            match("[^'\\n\\r\\\\]");
+        } else {
+            throw new ParseException("Invalid or empty character literal", chars.index);
+        }
+
+        // Must end with single quote
+        if (!match("'")) {
+            throw new ParseException("Unterminated character literal", chars.index);
+        }
+
+        return chars.emit(Token.Type.CHARACTER);
     }
 
     public Token lexString() {
-        throw new UnsupportedOperationException(); //TODO
+        // Must start with double quote
+        if (!match("\"")) {
+            throw new ParseException("String must start with \"", chars.index);
+        }
+
+        // Keep consuming characters until closing quote
+        while (peek("[^\"\\n\\r\\\\]") || peek("\\\\")) {
+            if (peek("\\\\")) {
+                lexEscape();
+            } else {
+                match("[^\"\\n\\r\\\\]");
+            }
+        }
+
+        // Must end with double quote
+        if (!match("\"")) {
+            throw new ParseException("Unterminated string", chars.index);
+        }
+
+        return chars.emit(Token.Type.STRING);
     }
 
     public void lexEscape() {
-        throw new UnsupportedOperationException(); //TODO
+        // Must start with backslash
+        if (!match("\\\\")) {
+            throw new ParseException("Escape must start with backslash", chars.index);
+        }
+
+        // Must be followed by one of: b n r t ' " \
+        if (!match("[bnrt'\"\\\\]")) {
+            throw new ParseException("Invalid escape sequence", chars.index);
+        }
     }
 
     //Stubbed
