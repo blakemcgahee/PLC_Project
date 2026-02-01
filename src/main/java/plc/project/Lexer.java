@@ -77,13 +77,49 @@ public final class Lexer {
         return chars.emit(Token.Type.IDENTIFIER);
     }
 
-    // Stubbed
     public Token lexNumber() {
-        // Temporary stub - just match any digits and optional sign
-        match("[+-]");  // optional sign
+        // Match optional sign
+        match("[+-]");
+
+        // Check for leading zero
+        if (peek("0", "\\.")) {
+            // "0." is start of a decimal like "0.5"
+            match("0");
+            match("\\.");
+            if (!match("[0-9]")) {
+                throw new ParseException("Decimal must have digits after decimal point", chars.index);
+            }
+            while (match("[0-9]")) {
+                // consume remaining decimal digits
+            }
+            return chars.emit(Token.Type.DECIMAL);
+        } else if (peek("0")) {
+            // Just "0" by itself
+            match("0");
+            return chars.emit(Token.Type.INTEGER);
+        }
+
+        // Non-zero number
+        if (!match("[1-9]")) {
+            throw new ParseException("Number must start with a digit", chars.index);
+        }
+
+        // Match remaining digits
         while (match("[0-9]")) {
             // consume digits
         }
+
+        // Check for decimal point
+        if (peek("\\.", "[0-9]")) {
+            match("\\.");
+            match("[0-9]");
+            while (match("[0-9]")) {
+                // consume decimal digits
+            }
+            return chars.emit(Token.Type.DECIMAL);
+        }
+
+        // No decimal point, it's an integer
         return chars.emit(Token.Type.INTEGER);
     }
 
