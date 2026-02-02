@@ -138,18 +138,25 @@ public final class Lexer {
     }
 
     public Token lexCharacter() {
+        // Match opening single quote
         if (!match("'")) {
             throw new ParseException("Character must start with '", chars.index);
         }
 
+        // Check for escape sequence (e.g., '\n', '\t')
         if (peek("\\\\")) {
-            lexEscape();
-        } else if (chars.has(0) && chars.get(0) != '\'' && chars.get(0) != '\n' && chars.get(0) != '\r') {
-            chars.advance();
-        } else {
+            lexEscape();  // Handle \b, \n, \r, \t, ', ", \
+        }
+        // Check for valid single character (not quote, newline, or carriage return)
+        else if (chars.has(0) && chars.get(0) != '\'' && chars.get(0) != '\n' && chars.get(0) != '\r') {
+            chars.advance();  // Consume the character
+        }
+        // Empty or invalid character
+        else {
             throw new ParseException("Invalid or empty character literal", chars.index);
         }
 
+        // Match closing single quote
         if (!match("'")) {
             throw new ParseException("Unterminated character literal", chars.index);
         }
@@ -157,19 +164,24 @@ public final class Lexer {
         return chars.emit(Token.Type.CHARACTER);
     }
 
+
     public Token lexString() {
+        // Match opening double quote
         if (!match("\"")) {
             throw new ParseException("String must start with \"", chars.index);
         }
 
+        // Keep consuming characters until we hit closing quote, newline, or end of input
         while (chars.has(0) && chars.get(0) != '"' && chars.get(0) != '\n' && chars.get(0) != '\r') {
+            // Check for escape sequence (e.g., \", \\, \n)
             if (peek("\\\\")) {
-                lexEscape();
+                lexEscape();  // Handle \b, \n, \r, \t, ', ", \
             } else {
-                chars.advance();
+                chars.advance();  // Regular character, consume it
             }
         }
 
+        // Match closing double quote (or throw if unterminated)
         if (!match("\"")) {
             throw new ParseException("Unterminated string", chars.index);
         }
