@@ -1,5 +1,6 @@
 package plc.project;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -28,7 +29,20 @@ public final class Lexer {
      * whitespace where appropriate.
      */
     public List<Token> lex() {
-        throw new UnsupportedOperationException(); //TODO
+        List<Token> tokens = new ArrayList<>();
+
+        while (chars.has(0)) {
+            // Skip whitespace
+            if (peek("[ \\t\\n\\r]")) {
+                match("[ \\t\\n\\r]");
+                chars.skip();  // Reset token length
+            } else {
+                // Lex the next token
+                tokens.add(lexToken());
+            }
+        }
+
+        return tokens;
     }
 
     /**
@@ -124,22 +138,18 @@ public final class Lexer {
     }
 
     public Token lexCharacter() {
-        // Must start with single quote
         if (!match("'")) {
             throw new ParseException("Character must start with '", chars.index);
         }
 
-        // Check for escape or regular character
         if (peek("\\\\")) {
             lexEscape();
-        } else if (peek("[^'\\n\\r\\\\]")) {
-            // Any character except ', newline, or backslash
-            match("[^'\\n\\r\\\\]");
+        } else if (chars.has(0) && chars.get(0) != '\'' && chars.get(0) != '\n' && chars.get(0) != '\r') {
+            chars.advance();
         } else {
             throw new ParseException("Invalid or empty character literal", chars.index);
         }
 
-        // Must end with single quote
         if (!match("'")) {
             throw new ParseException("Unterminated character literal", chars.index);
         }
@@ -148,21 +158,18 @@ public final class Lexer {
     }
 
     public Token lexString() {
-        // Must start with double quote
         if (!match("\"")) {
             throw new ParseException("String must start with \"", chars.index);
         }
 
-        // Keep consuming characters until closing quote
-        while (peek("[^\"\\n\\r\\\\]") || peek("\\\\")) {
+        while (chars.has(0) && chars.get(0) != '"' && chars.get(0) != '\n' && chars.get(0) != '\r') {
             if (peek("\\\\")) {
                 lexEscape();
             } else {
-                match("[^\"\\n\\r\\\\]");
+                chars.advance();
             }
         }
 
-        // Must end with double quote
         if (!match("\"")) {
             throw new ParseException("Unterminated string", chars.index);
         }
@@ -182,14 +189,22 @@ public final class Lexer {
         }
     }
 
-    //Stubbed
     public Token lexOperator() {
-        // Match any single character as an operator
-        if (chars.has(0)) {
-            chars.advance();
+        // Check for two-character comparison operators first
+        if (peek("[<>!=]", "=")) {
+            match("[<>!=]");
+            match("=");
             return chars.emit(Token.Type.OPERATOR);
         }
-        throw new ParseException("No character to lex as operator", chars.index);
+
+        // Any other single character (except whitespace)
+        if (peek("[^ \\t\\n\\r]")) {
+            match("[^ \\t\\n\\r]");
+            return chars.emit(Token.Type.OPERATOR);
+        }
+
+        // If we get here, no valid operator found
+        throw new ParseException("Invalid operator", chars.index);
     }
 
     /**
