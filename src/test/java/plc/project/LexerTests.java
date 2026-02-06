@@ -129,6 +129,33 @@ public class LexerTests {
         );
     }
 
+    @ParameterizedTest
+    @MethodSource
+    void testWhitespace(String test, String input, List<Token> expected) {
+        test(input, expected, true);
+    }
+
+    private static Stream<Arguments> testWhitespace() {
+        return Stream.of(
+                Arguments.of("Space Separator", "one two", Arrays.asList(
+                        new Token(Token.Type.IDENTIFIER, "one", 0),
+                        new Token(Token.Type.IDENTIFIER, "two", 4)
+                )),
+
+                Arguments.of("Tab Separator", "one\ttwo", Arrays.asList(
+                        new Token(Token.Type.IDENTIFIER, "one", 0),
+                        new Token(Token.Type.IDENTIFIER, "two", 4)
+                ))
+        );
+    }
+
+    @Test
+    void testInvalidCharacter() {
+        ParseException exception = Assertions.assertThrows(ParseException.class,
+                () -> new Lexer("one@two").lex());
+        Assertions.assertEquals(3, exception.getIndex());  // @ is at index 3
+    }
+
     @Test
     void testException() {
         ParseException exception = Assertions.assertThrows(ParseException.class,

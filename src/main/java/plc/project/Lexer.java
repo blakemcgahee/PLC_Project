@@ -202,21 +202,22 @@ public final class Lexer {
     }
 
     public Token lexOperator() {
-        // Check for two-character comparison operators first
+        // Two-character comparisons: <=, >=, !=, ==
         if (peek("[<>!=]", "=")) {
             match("[<>!=]");
             match("=");
             return chars.emit(Token.Type.OPERATOR);
         }
 
-        // Any other single character (except whitespace)
-        if (peek("[^ \\t\\n\\r]")) {
-            match("[^ \\t\\n\\r]");
+        // Single character operators (common programming operators only)
+        // Includes: + - * / ( ) [ ] { } ; : , . < > = !
+        if (peek("[+\\-*/()\\[\\]{}:;,.<>=!]")) {
+            match("[+\\-*/()\\[\\]{}:;,.<>=!]");
             return chars.emit(Token.Type.OPERATOR);
         }
 
-        // If we get here, no valid operator found
-        throw new ParseException("Invalid operator", chars.index);
+        // If we get here, it's an invalid character
+        throw new ParseException("Invalid character", chars.index);
     }
 
     /**
