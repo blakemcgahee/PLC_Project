@@ -1,6 +1,7 @@
 package plc.project;
 
 import java.util.List;
+import java.util.Arrays;
 
 /**
  * The parser takes the sequence of tokens emitted by the lexer and turns that
@@ -158,20 +159,52 @@ public final class Parser {
      * instead it is either a {@link Token.Type}, which matches if the token's
      * type is the same, or a {@link String}, which matches if the token's
      * literal is the same.
-     *
+
      * In other words, {@code Token(IDENTIFIER, "literal")} is matched by both
      * {@code peek(Token.Type.IDENTIFIER)} and {@code peek("literal")}.
-     */
-    private boolean peek(Object... patterns) {
-        throw new UnsupportedOperationException(); //TODO (in lecture)
-    }
 
+     * Returns true if the current sequence of tokens matches the given patterns.
+     * Patterns can be Token.Type (matches token type) or String (matches token literal).
+     */
+
+    private boolean peek(Object... patterns) {
+        for (int i = 0; i < patterns.length; i++) {
+            if (!tokens.has(i)) {
+                return false;
+            }
+            Token token = tokens.get(i);
+
+            if (patterns[i] instanceof Token.Type) {
+                // Pattern is a Token.Type check if types match
+                if (token.getType() != patterns[i]) {
+                    return false;
+                }
+            } else if (patterns[i] instanceof String) {
+                // Pattern is a String check if literals match
+                if (!token.getLiteral().equals(patterns[i])) {
+                    return false;
+                }
+            } else {
+                throw new AssertionError("Invalid pattern type: " + patterns[i].getClass());
+            }
+        }
+        return true;
+    }
     /**
      * As in the lexer, returns {@code true} if {@link #peek(Object...)} is true
      * and advances the token stream.
+
+     * Returns true if peek() succeeds and advances the token stream.
+     * If peek() fails, the token stream is not modified.
      */
     private boolean match(Object... patterns) {
-        throw new UnsupportedOperationException(); //TODO (in lecture)
+        boolean peek = peek(patterns);
+        if (peek) {
+            for (int i = 0; i < patterns.length; i++) {
+                tokens.advance();
+            }
+        }
+        return peek;
     }
 
     private static final class TokenStream {
@@ -207,3 +240,5 @@ public final class Parser {
     }
 
 }
+
+
