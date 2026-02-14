@@ -38,7 +38,7 @@ This project implements a compiler for a custom programming language in Java. Th
 - Unit tests for each token/statement type
 - Integration tests for complete expressions and statements
 - Edge case testing for error conditions
-- All provided test suites pass (49 Lexer tests, 37 Parser tests)
+- All provided test suites pass (31 Lexer tests, 18 Parser tests)
 
 ---
 
