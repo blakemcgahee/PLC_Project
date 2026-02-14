@@ -51,22 +51,75 @@ public final class Parser {
         throw new UnsupportedOperationException(); //TODO
     }
 
+
     /**
      * Parses the {@code statement} rule and delegates to the necessary method.
      * If the next tokens do not start a declaration, if, for, while, or return
      * statement, then it is an expression/assignment statement.
      */
     public Ast.Statement parseStatement() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        if (peek("LET")) {
+            return parseDeclarationStatement();
+        } else if (peek("IF")) {
+            return parseIfStatement();
+        } else if (peek("FOR")) {
+            return parseForStatement();
+        } else if (peek("WHILE")) {
+            return parseWhileStatement();
+        } else if (peek("RETURN")) {
+            return parseReturnStatement();
+        } else {
+            // It must be an Expression or an Assignment
+            Ast.Expression left = parseExpression();
+
+            // Check if it is an assignment (e.g., name = value;)
+            if (match("=")) {
+                Ast.Expression right = parseExpression();
+
+                if (!match(";")) {
+                    // Handle missing semicolon safely (check if at end of stream)
+                    int index = tokens.has(0) ? tokens.getErrorIndex() :
+                            tokens.get(-1).getIndex() + tokens.get(-1).getLiteral().length();
+                    throw new ParseException("Expected ';' after assignment", index);
+                }
+
+                return new Ast.Statement.Assignment(left, right);
+            }
+            // Otherwise, it is just an expression statement (e.g., name();)
+            else {
+                if (!match(";")) {
+                    int index = tokens.has(0) ? tokens.getErrorIndex() :
+                            tokens.get(-1).getIndex() + tokens.get(-1).getLiteral().length();
+                    throw new ParseException("Expected ';' after expression statement", index);
+                }
+
+                return new Ast.Statement.Expression(left);
+            }
+        }
     }
 
-    /**
-     * Parses a declaration statement from the {@code statement} rule. This
-     * method should only be called if the next tokens start a declaration
-     * statement, aka {@code LET}.
-     */
     public Ast.Statement.Declaration parseDeclarationStatement() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        match("LET");
+
+        if (!peek(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Expected identifier after LET",
+                    tokens.has(0) ? tokens.getErrorIndex() : 0);
+        }
+
+        String name = tokens.get(0).getLiteral();
+        match(Token.Type.IDENTIFIER);
+
+        Optional<Ast.Expression> value = Optional.empty();
+        if (match("=")) {
+            value = Optional.of(parseExpression());
+        }
+
+        if (!match(";")) {
+            throw new ParseException("Expected ';' after declaration",
+                    tokens.has(0) ? tokens.getErrorIndex() : 0);
+        }
+
+        return new Ast.Statement.Declaration(name, value);
     }
 
     /**
@@ -75,16 +128,114 @@ public final class Parser {
      * {@code IF}.
      */
     public Ast.Statement.If parseIfStatement() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        match("IF");
+        Ast.Expression condition = parseExpression();
+
+        if (!match("DO")) {
+            throw new ParseException("Expected DO after IF condition",
+                    tokens.has(0) ? tokens.getErrorIndex() : tokens.get(-1).getIndex());
+        }
+
+        List<Ast.Statement> thenStatements = new ArrayList<>();
+        // Keep parsing statements until we hit ELSE or END
+        while (!peek("ELSE") && !peek("END")) {
+            thenStatements.add(parseStatement());
+        }
+
+        List<Ast.Statement> elseStatements = new ArrayList<>();
+        if (match("ELSE")) {
+            while (!peek("END")) {
+                elseStatements.add(parseStatement());
+            }
+        }
+
+        if (!match("END")) {
+            throw new ParseException("Expected END after IF statement",
+                    tokens.has(0) ? tokens.getErrorIndex() : tokens.get(-1).getIndex());
+        }
+
+        return new Ast.Statement.If(condition, thenStatements, elseStatements);
     }
 
-    /**
-     * Parses a for statement from the {@code statement} rule. This method
-     * should only be called if the next tokens start a for statement, aka
-     * {@code FOR}.
-     */
     public Ast.Statement.For parseForStatement() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        match("FOR");
+
+        if (!match("(")) {
+            throw new ParseException("Expected '(' after FOR", tokens.getErrorIndex());
+        }
+
+        // Optional initialization
+        Ast.Statement initialization = null;
+        if (!peek(";")) {
+            if (!peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected identifier in FOR initialization", tokens.getErrorIndex());
+            }
+            String name = tokens.get(0).getLiteral();
+            match(Token.Type.IDENTIFIER);
+
+            if (!match("=")) {
+                throw new ParseException("Expected '=' in FOR initialization", tokens.getErrorIndex());
+            }
+
+            Ast.Expression value = parseExpression();
+            initialization = new Ast.Statement.Assignment(
+                    new Ast.Expression.Access(Optional.empty(), name),
+                    value
+            );
+        }
+
+        if (!match(";")) {
+            throw new ParseException("Expected ';' after FOR initialization", tokens.getErrorIndex());
+        }
+
+        // Condition (required)
+        Ast.Expression condition = parseExpression();
+
+        if (!match(";")) {
+            throw new ParseException("Expected ';' after FOR condition", tokens.getErrorIndex());
+        }
+
+        // Optional increment
+        Ast.Statement increment = null;
+        if (!peek(")")) {
+            if (!peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected identifier in FOR increment", tokens.getErrorIndex());
+            }
+            String name = tokens.get(0).getLiteral();
+            match(Token.Type.IDENTIFIER);
+
+            if (!match("=")) {
+                throw new ParseException("Expected '=' in FOR increment", tokens.getErrorIndex());
+            }
+
+            Ast.Expression value = parseExpression();
+            increment = new Ast.Statement.Assignment(
+                    new Ast.Expression.Access(Optional.empty(), name),
+                    value
+            );
+        }
+
+        if (!match(")")) {
+            throw new ParseException("Expected ')' after FOR header", tokens.getErrorIndex());
+        }
+
+        // Parse body statements
+        // Note: Initially forgot to check for END, caused infinite loop
+        List<Ast.Statement> statements = new ArrayList<>();
+        while (!peek("END")) {
+            if (!tokens.has(0)) {
+                throw new ParseException("Expected END after FOR loop", tokens.getErrorIndex());
+            }
+            statements.add(parseStatement());
+        }
+
+        if (!match("END")) {
+            throw new ParseException("Expected END after FOR loop", tokens.getErrorIndex());
+        }
+
+        // The constructor expects 4 arguments: init statement, condition, increment statement, body
+        // For optional parts, we need to pass actual Statement objects or handle them appropriately
+        return new Ast.Statement.For(initialization, condition, increment, statements);
     }
 
     /**
@@ -93,7 +244,25 @@ public final class Parser {
      * {@code WHILE}.
      */
     public Ast.Statement.While parseWhileStatement() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        match("WHILE");
+        Ast.Expression condition = parseExpression();
+
+        if (!match("DO")) {
+            throw new ParseException("Expected DO after WHILE condition",
+                    tokens.has(0) ? tokens.getErrorIndex() : tokens.get(-1).getIndex());
+        }
+
+        List<Ast.Statement> statements = new ArrayList<>();
+        while (!peek("END")) {
+            statements.add(parseStatement());
+        }
+
+        if (!match("END")) {
+            throw new ParseException("Expected END after WHILE loop",
+                    tokens.has(0) ? tokens.getErrorIndex() : tokens.get(-1).getIndex());
+        }
+
+        return new Ast.Statement.While(condition, statements);
     }
 
     /**
@@ -102,7 +271,15 @@ public final class Parser {
      * {@code RETURN}.
      */
     public Ast.Statement.Return parseReturnStatement() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        match("RETURN");
+        Ast.Expression value = parseExpression();
+
+        if (!match(";")) {
+            throw new ParseException("Expected ';' after return value",
+                    tokens.has(0) ? tokens.getErrorIndex() : tokens.get(-1).getIndex());
+        }
+
+        return new Ast.Statement.Return(value);
     }
 
     /**
@@ -190,7 +367,7 @@ public final class Parser {
         // Keep parsing '.' access as long as we see dots
         while (match(".")) {
             if (!peek(Token.Type.IDENTIFIER)) {
-                throw new ParseException("Expected identifier after '.'", tokens.get(0).getIndex());
+                throw new ParseException("Expected identifier after '.'", tokens.getErrorIndex());
             }
 
             Token fieldToken = tokens.get(0);
@@ -210,7 +387,7 @@ public final class Parser {
                 }
 
                 if (!match(")")) {
-                    throw new ParseException("Expected closing ')'", tokens.get(0).getIndex());
+                    throw new ParseException("Expected closing ')'", tokens.getErrorIndex());
                 }
 
                 expression = new Ast.Expression.Function(Optional.of(expression), fieldName, arguments);
@@ -314,7 +491,7 @@ public final class Parser {
         else if (match("(")) {
             Ast.Expression expression = parseExpression();
             if (!match(")")) {
-                throw new ParseException("Expected closing ')'", tokens.get(0).getIndex());
+                throw new ParseException("Expected closing ')'", tokens.getErrorIndex());
             }
             return new Ast.Expression.Group(expression);
         }
@@ -337,7 +514,7 @@ public final class Parser {
                 }
 
                 if (!match(")")) {
-                    throw new ParseException("Expected closing ')'", tokens.get(0).getIndex());
+                    throw new ParseException("Expected closing ')'", tokens.getErrorIndex());
                 }
 
                 return new Ast.Expression.Function(java.util.Optional.empty(), name, arguments);
@@ -349,7 +526,7 @@ public final class Parser {
         }
         // Nothing matched - invalid primary expression
         else {
-            throw new ParseException("Invalid primary expression", tokens.get(0).getIndex());
+            throw new ParseException("Invalid primary expression", tokens.getErrorIndex());
         }
     }
 
@@ -435,6 +612,21 @@ public final class Parser {
          */
         public void advance() {
             index++;
+        }
+
+        /**
+         * Gets the current index for error reporting.
+         * Returns the index of the current token, or the end of the last token if no tokens remain.
+         */
+        public int getErrorIndex() {
+            if (has(0)) {
+                return get(0).getIndex();
+            } else if (index > 0) {
+                Token lastToken = tokens.get(index - 1);
+                return lastToken.getIndex() + lastToken.getLiteral().length();
+            } else {
+                return 0;
+            }
         }
 
     }
