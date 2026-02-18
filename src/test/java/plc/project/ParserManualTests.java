@@ -289,4 +289,55 @@ public class ParserManualTests {
         Ast.Expression.Binary outer = (Ast.Expression.Binary) expr;
         Assertions.assertEquals("==", outer.getOperator());
     }
+
+    // Trying to chase missing closing parenthesis test failure from last feedback
+    @Test
+    void testExpressionMissingClosingParen_tokens() {
+        List<Token> tokens = Arrays.asList(
+                new Token(Token.Type.OPERATOR, "(", 0),
+                new Token(Token.Type.IDENTIFIER, "expr", 1)
+                // no closing )
+        );
+        Parser p = new Parser(tokens);
+        Assertions.assertThrows(ParseException.class, p::parseExpression);
+    }
+
+    @Test
+    void testExpressionMissingOperand_tokens() {
+        List<Token> tokens = Arrays.asList(
+                new Token(Token.Type.IDENTIFIER, "expr", 0),
+                new Token(Token.Type.OPERATOR, "-", 5)
+                // missing RHS operand
+        );
+        Parser p = new Parser(tokens);
+        Assertions.assertThrows(ParseException.class, p::parseExpression);
+    }
+
+    @Test
+    void testNoIndexOutOfBoundsOnMissingOperand() {
+        Parser p = new Parser(new Lexer("expr -").lex());
+
+        try {
+            p.parseExpression();
+            Assertions.fail("Expected ParseException");
+        } catch (IndexOutOfBoundsException ex) {
+            Assertions.fail("Got IndexOutOfBoundsException (bug) instead of ParseException: " + ex.getMessage());
+        } catch (ParseException ex) {
+            // expected
+        }
+    }
+
+    @Test
+    void testNoIndexOutOfBoundsOnMissingClosingParen() {
+        Parser p = new Parser(new Lexer("(expr").lex());
+
+        try {
+            p.parseExpression();
+            Assertions.fail("Expected ParseException");
+        } catch (IndexOutOfBoundsException ex) {
+            Assertions.fail("Got IndexOutOfBoundsException (bug) instead of ParseException: " + ex.getMessage());
+        } catch (ParseException ex) {
+            // expected
+        }
+    }
 }
