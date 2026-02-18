@@ -1,9 +1,6 @@
 package plc.project;
 
 import java.util.List;
-import java.util.Arrays;
-import java.math.BigInteger;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Optional;
 
@@ -32,7 +29,27 @@ public final class Parser {
      * Parses the {@code source} rule.
      */
     public Ast.Source parseSource() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        // source ::= field* method*
+        // Array definitions for parseField and parseMethod
+        List<Ast.Field>  fields = new ArrayList<>();
+        List<Ast.Method>  methods = new ArrayList<>();
+
+        // Look for "LET" or "DEF"; the only valid options
+        while (tokens.has(0) && peek("LET")) {
+            fields.add(parseField());
+        }
+
+        while (tokens.has(0) && peek("DEF")) {
+            methods.add(parseMethod());
+        }
+
+        // All other possibilities are invalid at Source
+        if (tokens.has(0)) {
+            throw new ParseException("Unexpected token in Source: " + tokens.get(0).getLiteral(),
+                    tokens.getErrorIndex());
+        }
+
+        return new Ast.Source(fields, methods);
     }
 
     /**
@@ -40,7 +57,30 @@ public final class Parser {
      * next tokens start a field, aka {@code LET}.
      */
     public Ast.Field parseField() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        // field ::= 'LET' 'CONST'? identifier ('=' expression)? ';'
+        // Additional check for "LET"
+        if (!match("LET")) {
+            throw new ParseException("Expected LET", tokens.getErrorIndex());
+        }
+        // optional CONST (consumes token only if present)
+        boolean constant = match("CONST");
+
+        if (!match(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Expected IDENTIFIER after LET (CONST)?", tokens.getErrorIndex());
+        }
+        String name = tokens.get(-1).getLiteral();
+
+        Optional<Ast.Expression> value = Optional.empty();
+        if (match("=")) {
+            value = Optional.of(parseExpression());
+        }
+        if (!match(";")) {
+            throw new ParseException("Expected ';' after declaration",
+                    tokens.has(0) ? tokens.getErrorIndex() : 0);
+        }
+        // For: public Field(String name, boolean constant, Optional<Ast.Expression> value)
+        // boolean constant tested for inclusion of CONST
+        return new Ast.Field(name, constant, value);
     }
 
     /**
@@ -48,7 +88,58 @@ public final class Parser {
      * next tokens start a method, aka {@code DEF}.
      */
     public Ast.Method parseMethod() throws ParseException {
-        throw new UnsupportedOperationException(); //TODO
+        // method ::= 'DEF' identifier '(' (identifier (',' identifier)*)? ')' 'DO' statement* 'END'
+        // Additional check for "DEF"
+        if (!match("DEF")) {
+            throw new ParseException("Expected DEF", tokens.getErrorIndex());
+        }
+
+        if (!match(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Expected IDENTIFIER after DEF", tokens.getErrorIndex());
+        }
+
+        String name = tokens.get(-1).getLiteral();
+
+        if (!match("(")) {
+            throw new ParseException("Expected '(' after method", tokens.getErrorIndex());
+        }
+
+        List<String> parameters = new ArrayList<>();
+
+        // parameter list creation (identifier (',' identifier)*)?
+        if (match(Token.Type.IDENTIFIER)) {
+            parameters.add(tokens.get(-1).getLiteral());
+
+            while (match(",")) {
+                if (!match(Token.Type.IDENTIFIER)) {
+                    throw new ParseException("Expected IDENTIFIER after ','", tokens.getErrorIndex());
+                }
+                parameters.add(tokens.get(-1).getLiteral());
+            }
+        }
+
+        if (!match(")")) {
+            throw new ParseException("Expected ')' after parameters", tokens.getErrorIndex());
+        }
+
+        if (!match("DO")) {
+            throw new ParseException("Expected DO before statements", tokens.getErrorIndex());
+        }
+
+        // Potential list of statement -> statement*
+        List<Ast.Statement> statements = new ArrayList<>();
+        while (!peek("END")) {
+            if (!tokens.has(0)) {
+                throw new ParseException("Expected END to terminate method", tokens.getErrorIndex());
+            }
+            statements.add(parseStatement());
+        }
+
+        if (!match("END")) {
+            throw new ParseException("Expected END to terminate method", tokens.getErrorIndex());
+        }
+
+        return new Ast.Method(name, parameters, statements);
     }
 
 
