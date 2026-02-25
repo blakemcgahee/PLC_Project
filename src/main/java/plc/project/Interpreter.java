@@ -1,4 +1,6 @@
 package plc.project;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
@@ -33,7 +35,10 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.Expression ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // Evaluate the expression for its side effects (e.g., print("Hello, World!")).
+        // The result is intentionally discarded - statement expressions don't return a value.
+        visit(ast.getExpression());
+        return Environment.NIL;
     }
 
     @Override
@@ -68,27 +73,159 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Expression.Literal ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // NIL is represented as a null literal in the AST, return the singleton NIL object
+        // rather than wrapping null inside a new PlcObject, which would cause issues downstream.
+        if (ast.getLiteral() == null) {
+            return Environment.NIL;
+        }
+
+        // For all other literal types (Boolean, BigInteger, BigDecimal, Character, String),
+        // wrap the raw Java value in a PlcObject so the interpreter can work with it uniformly.
+        return Environment.create(ast.getLiteral());
     }
 
     @Override
     public Environment.PlcObject visit(Ast.Expression.Group ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // A group expression is purely for controlling precedence during parsing.
+        // At interpretation time, the grouping has no effect we just evaluate what's inside.
+        return visit(ast.getExpression());
     }
 
     @Override
     public Environment.PlcObject visit(Ast.Expression.Binary ast) {
-        throw new UnsupportedOperationException(); //TODO
+        String op = ast.getOperator();
+
+        // AND/OR use short circuit evaluation, we only evaluate the RHS if necessary.
+        // Per the spec, both sides must be Booleans.
+        if (op.equals("AND")) {
+            boolean lhs = requireType(Boolean.class, visit(ast.getLeft()));
+            // Short circuit: if LHS is false, the result is always false - skip RHS
+            if (!lhs) return Environment.create(false);
+            boolean rhs = requireType(Boolean.class, visit(ast.getRight()));
+            return Environment.create(rhs);
+        } else if (op.equals("OR")) {
+            boolean lhs = requireType(Boolean.class, visit(ast.getLeft()));
+            // Short circuit: if LHS is true, the result is always true - skip RHS
+            if (lhs) return Environment.create(true);
+            boolean rhs = requireType(Boolean.class, visit(ast.getRight()));
+            return Environment.create(rhs);
+        }
+
+        // For all remaining operators, evaluate both sides upfront
+        Environment.PlcObject left = visit(ast.getLeft());
+        Environment.PlcObject right = visit(ast.getRight());
+
+        // Comparison operators: LHS must be Comparable, RHS must be the same type as LHS
+        if (op.equals("<") || op.equals("<=") || op.equals(">") || op.equals(">=")) {
+            Comparable<Object> lhs = requireType(Comparable.class, left);
+            // RHS must match the exact same class as LHS, no mixed type comparisons allowed
+            Object rhs = requireType(left.getValue().getClass(), right);
+            int result = lhs.compareTo(rhs);
+            switch (op) {
+                case "<":  return Environment.create(result < 0);
+                case "<=": return Environment.create(result <= 0);
+                case ">":  return Environment.create(result > 0);
+                case ">=": return Environment.create(result >= 0);
+            }
+        }
+
+        // Equality: uses Objects.equals which handles null safely, unlike .equals()
+        if (op.equals("==")) {
+            return Environment.create(java.util.Objects.equals(left.getValue(), right.getValue()));
+        } else if (op.equals("!=")) {
+            return Environment.create(!java.util.Objects.equals(left.getValue(), right.getValue()));
+        }
+
+        // Addition: handles both String concatenation and BigInteger/BigDecimal addition
+        if (op.equals("+")) {
+            // If either side is a String, concatenate both as strings
+            if (left.getValue() instanceof String || right.getValue() instanceof String) {
+                return Environment.create(left.getValue().toString() + right.getValue().toString());
+            }
+            // Otherwise both must be the same numeric type
+            if (left.getValue() instanceof java.math.BigInteger) {
+                return Environment.create(
+                        requireType(java.math.BigInteger.class, left)
+                                .add(requireType(java.math.BigInteger.class, right))
+                );
+            } else if (left.getValue() instanceof java.math.BigDecimal) {
+                return Environment.create(
+                        requireType(java.math.BigDecimal.class, left)
+                                .add(requireType(java.math.BigDecimal.class, right))
+                );
+            }
+            throw new RuntimeException("Unsupported type for + operator: " + left.getValue().getClass().getName());
+        }
+
+        // Subtraction and Multiplication: both sides must be the same BigInteger/BigDecimal type
+        if (op.equals("-") || op.equals("*")) {
+            if (left.getValue() instanceof java.math.BigInteger) {
+                java.math.BigInteger lhs = requireType(java.math.BigInteger.class, left);
+                java.math.BigInteger rhs = requireType(java.math.BigInteger.class, right);
+                return Environment.create(op.equals("-") ? lhs.subtract(rhs) : lhs.multiply(rhs));
+            } else if (left.getValue() instanceof java.math.BigDecimal) {
+                java.math.BigDecimal lhs = requireType(java.math.BigDecimal.class, left);
+                java.math.BigDecimal rhs = requireType(java.math.BigDecimal.class, right);
+                return Environment.create(op.equals("-") ? lhs.subtract(rhs) : lhs.multiply(rhs));
+            }
+            throw new RuntimeException("Unsupported type for " + op + " operator: " + left.getValue().getClass().getName());
+        }
+
+        // Division: same type requirement, plus zero-division check.
+        // BigDecimal uses HALF_EVEN rounding per the spec.
+        if (op.equals("/")) {
+            if (left.getValue() instanceof java.math.BigInteger) {
+                java.math.BigInteger lhs = requireType(java.math.BigInteger.class, left);
+                java.math.BigInteger rhs = requireType(java.math.BigInteger.class, right);
+                if (rhs.equals(java.math.BigInteger.ZERO))
+                    throw new RuntimeException("Division by zero.");
+                return Environment.create(lhs.divide(rhs));
+            } else if (left.getValue() instanceof java.math.BigDecimal) {
+                java.math.BigDecimal lhs = requireType(java.math.BigDecimal.class, left);
+                java.math.BigDecimal rhs = requireType(java.math.BigDecimal.class, right);
+                if (rhs.compareTo(java.math.BigDecimal.ZERO) == 0)
+                    throw new RuntimeException("Division by zero.");
+                return Environment.create(lhs.divide(rhs, java.math.RoundingMode.HALF_EVEN));
+            }
+            throw new RuntimeException("Unsupported type for / operator: " + left.getValue().getClass().getName());
+        }
+
+        throw new RuntimeException("Unknown binary operator: " + op);
     }
 
     @Override
     public Environment.PlcObject visit(Ast.Expression.Access ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // If there's a receiver, evaluate the receiver first
+        // then look up the named field on the resulting PlcObject.
+        if (ast.getReceiver().isPresent()) {
+            Environment.PlcObject receiver = visit(ast.getReceiver().get());
+            return receiver.getField(ast.getName()).getValue();
+        }
+
+        // No receiver means it is a simple variable access.
+        // Look it up in the current scope, walking up the scope chain if needed.
+        return scope.lookupVariable(ast.getName()).getValue();
     }
 
     @Override
     public Environment.PlcObject visit(Ast.Expression.Function ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // Evaluate all argument expressions upfront into a list of PlcObjects
+        // that will be passed into the function/method call.
+        List<Environment.PlcObject> args = new ArrayList<>();
+        for (Ast.Expression arg : ast.getArguments()) {
+            args.add(visit(arg));
+        }
+
+        // If there's a receiver, evaluate the receiver first
+        // then invoke the named method on that PlcObject, passing the evaluated args.
+        if (ast.getReceiver().isPresent()) {
+            Environment.PlcObject receiver = visit(ast.getReceiver().get());
+            return receiver.callMethod(ast.getName(), args);
+        }
+
+        // No receiver means it is a plain function call.
+        // Look up the function by name and arity in the current scope, then invoke it.
+        return scope.lookupFunction(ast.getName(), ast.getArguments().size()).invoke(args);
     }
 
     /**
