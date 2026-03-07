@@ -20,17 +20,52 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Source ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // define fields
+        for (Ast.Field field : ast.getFields()) { visit(field); }
+        // register methods
+        for  (Ast.Method method : ast.getMethods()) { visit(method); }
+        // execute main
+        return scope.lookupFunction("main", 0).invoke(List.of());
     }
 
     @Override
     public Environment.PlcObject visit(Ast.Field ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // Goal is to define a global variable
+        // FIELDS: "LET x = 50;" and "LET CONST y = 0;"
+        Environment.PlcObject value = Environment.NIL;
+
+        // Determine if value exist and set to variable if so
+        if (ast.getValue().isPresent()) { value = visit(ast.getValue().get()); }
+
+        scope.defineVariable(ast.getName(), ast.getConstant(), value);
+
+        return Environment.NIL;
     }
 
     @Override
     public Environment.PlcObject visit(Ast.Method ast) {
-        throw new UnsupportedOperationException(); //TODO
+        // Define a function
+        /* METHOD: "DEF add(j, k) DO
+                        RETURN j + k;
+                    END"
+         */
+        scope.defineFunction(ast.getName(), ast.getParameters().size(), args -> {
+            Scope previousScope = scope;
+            scope = new Scope(previousScope);
+
+            try {
+                // bind parameters given the number of parameters
+                for (int i = 0; i < ast.getParameters().size(); i++) {
+                    scope.defineVariable(ast.getParameters().get(i), false, args.get(i));
+                }
+                // execute statements
+                for (Ast.Statement statement : ast.getStatements()) { visit(statement); }
+            } catch (Return r) {
+                return r.value;
+            } finally { scope = previousScope; }
+            return Environment.NIL;
+        });
+        return Environment.NIL;
     }
 
     @Override
