@@ -21,14 +21,16 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
     @Override
     public Environment.PlcObject visit(Ast.Source ast) {
 
-        // iterate through all
+        // iterate through all global variables and register each field
         for (Ast.Field field : ast.getFields()) {
             visit(field);
         }
 
-        // register methods
-        for  (Ast.Method method : ast.getMethods()) { visit(method); }
-        // execute main
+        // iterate through all defined methods and register in interpreter scope
+        for  (Ast.Method method : ast.getMethods()) {
+            visit(method);
+        }
+        // execute main with no parameters and return result
         return scope.lookupFunction("main", 0).invoke(List.of());
     }
 
@@ -36,11 +38,15 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
     public Environment.PlcObject visit(Ast.Field ast) {
         // Goal is to define a global variable
         // FIELDS: "LET x = 50;" and "LET CONST y = 0;"
+        // Initialize variable with default NIL
         Environment.PlcObject value = Environment.NIL;
 
         // Determine if value exist and set to variable if so
-        if (ast.getValue().isPresent()) { value = visit(ast.getValue().get()); }
-
+        if (ast.getValue().isPresent()) {
+            value = visit(ast.getValue().get());
+        }
+        // register teh variable inside of current scope
+        // arguments are (name, constant flag, value)
         scope.defineVariable(ast.getName(), ast.getConstant(), value);
 
         return Environment.NIL;
@@ -48,25 +54,31 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Method ast) {
-        // Define a function
+        // Register and store method for future use
         /* METHOD: "DEF add(j, k) DO
                         RETURN j + k;
                     END"
          */
+        //register function with (name, num of parms, function body)
         scope.defineFunction(ast.getName(), ast.getParameters().size(), args -> {
-            Scope previousScope = scope;
-            scope = new Scope(previousScope);
+            scope = new Scope(scope);
 
             try {
                 // bind parameters given the number of parameters
                 for (int i = 0; i < ast.getParameters().size(); i++) {
                     scope.defineVariable(ast.getParameters().get(i), false, args.get(i));
                 }
-                // execute statements
-                for (Ast.Statement statement : ast.getStatements()) { visit(statement); }
+                // execute statements inside function
+                for (Ast.Statement statement : ast.getStatements()) {
+                    visit(statement);
+                }
+            // catches the return exception used to exit functions and return value
             } catch (Return r) {
                 return r.value;
-            } finally { scope = previousScope; }
+            } finally {
+                // restore the previous scope after execution
+                scope = scope.getParent();
+            }
             return Environment.NIL;
         });
         return Environment.NIL;
@@ -92,7 +104,25 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.Assignment ast) {
-        throw new UnsupportedOperationException(); //TODO
+        /* goal is to execute assignments like "x = 5;" or "obj.field = 1;" */
+
+        // verify assignment target is valid, i.e. access expression
+        if (!(ast.getReceiver() instanceof Ast.Expression.Access access)) {
+            throw new RuntimeException("The assignment must receive an access expression");
+        }
+
+        // evaluate the rhs expression
+        Environment.PlcObject value = visit(ast.getValue());
+
+        // set value for "field" case else set value for variable case
+        if (access.getReceiver().isPresent()) {
+            Environment.PlcObject receiver = visit(access.getReceiver().get());
+            receiver.getField(access.getName()).setValue(value);
+        } else {
+            scope.lookupVariable(access.getName()).setValue(value);
+        }
+
+        return Environment.NIL;
     }
 
     @Override
@@ -127,7 +157,11 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.Return ast) {
-        throw new UnsupportedOperationException(); //TODO
+        /* goal is to return a value from a function */
+
+        // because "method" handler catches the return: "catch (Return r)"
+        // wrap expression in a return exception and throw it
+        throw new Return(visit(ast.getValue()));
     }
 
     @Override
