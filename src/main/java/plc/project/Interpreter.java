@@ -20,8 +20,12 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Source ast) {
-        // define fields
-        for (Ast.Field field : ast.getFields()) { visit(field); }
+
+        // iterate through all
+        for (Ast.Field field : ast.getFields()) {
+            visit(field);
+        }
+
         // register methods
         for  (Ast.Method method : ast.getMethods()) { visit(method); }
         // execute main
@@ -78,7 +82,12 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.Declaration ast) {
-        throw new UnsupportedOperationException(); //TODO
+        if (ast.getValue().isPresent()) {
+            scope.defineVariable(ast.getName(),false, visit(ast.getValue().get()));
+        } else {
+            scope.defineVariable(ast.getName(),false,Environment.NIL);
+        }
+        return Environment.NIL;
     }
 
     @Override
@@ -98,7 +107,22 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.While ast) {
-        throw new UnsupportedOperationException(); //TODO
+        while (requireType(Boolean.class, visit(ast.getCondition()))) {
+            try {
+                scope = new Scope(scope);
+
+                // alternate version of for loop statement to visit all statements
+                // ast.getStatements().forEach(this::visit);
+                // same as below
+
+                for (Ast.Statement statement : ast.getStatements()) {
+                    visit(statement);
+                }
+            } finally {
+                scope = scope.getParent();
+            }
+        }
+        return Environment.NIL;
     }
 
     @Override
