@@ -152,7 +152,31 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.For ast) {
-        throw new UnsupportedOperationException(); //TODO
+        /* goal is to iteratively execute block of statement(s) for defined increment */
+
+        // create a new loop scope within which to execute for statement
+        scope = new Scope(scope);
+
+        try {
+            // establish loop initialization
+            if (ast.getInitialization() != null) {
+                visit(ast.getInitialization());
+            }
+            // test each iteration to determine if execution proceeds
+            while (requireType(Boolean.class, visit(ast.getCondition()))) {
+                for (Ast.Statement statement : ast.getStatements()) {
+                    visit(statement);
+                }
+                // increment the counter
+                if (ast.getIncrement() != null) {
+                    visit(ast.getIncrement());
+                }
+            }
+        } finally {
+            // Return to previous scope
+            scope = scope.getParent();
+        }
+        return Environment.NIL;
     }
 
     @Override
