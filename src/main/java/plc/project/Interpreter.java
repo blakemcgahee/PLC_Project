@@ -127,7 +127,27 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Statement.If ast) {
-        throw new UnsupportedOperationException(); //TODO
+        /* goal is to execute statements depending upon boolean condition */
+
+        // Evaluate condition expression
+        boolean condition = requireType(Boolean.class, visit(ast.getCondition()));
+
+        // Choose which block of statement(s) to execute
+        List<Ast.Statement> branch = condition ? ast.getThenStatements() : ast.getElseStatements();
+
+        // Create a temporary scope within which to execute block(s)
+        scope = new Scope(scope);
+
+        try {
+            // Execute each statement in the selected branch of statement(s)
+            for (Ast.Statement statement : branch) {
+                visit(statement);
+            }
+        } finally {
+            // Return to previous scope
+            scope = scope.getParent();
+        }
+        return Environment.NIL;
     }
 
     @Override
