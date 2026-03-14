@@ -74,7 +74,7 @@ This project implements a compiler for a custom programming language in Java. Th
 - **Day 4:** If, While, and For statement execution with proper scope management
 - **Day 5:** Function/method definition and invocation, Return exception handling
 - **Day 6:** Lexical closure fix for function scope, TA feedback corrections
-- **Day 7:** Final testing, 43/43 tests passing
+- **Day 7:** Final testing, 43/43 tests passing, log function added to interpreter scope for baseline test compatibility
 
 ---
 
