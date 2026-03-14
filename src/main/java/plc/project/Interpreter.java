@@ -12,6 +12,10 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
             System.out.println(args.get(0).getValue());
             return Environment.NIL;
         });
+        scope.defineFunction("log", 1, args -> {
+            System.out.println(args.get(0).getValue());
+            return args.get(0); // returns the argument, not NIL
+        });
     }
 
     public Scope getScope() {
