@@ -60,8 +60,10 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
                     END"
          */
         //register function with (name, num of parms, function body)
+        Scope definitionScope = scope; // capture definition-time scope for lexical closure
         scope.defineFunction(ast.getName(), ast.getParameters().size(), args -> {
-            scope = new Scope(scope);
+            Scope previous = scope;
+            scope = new Scope(definitionScope); // parent = definition scope, not call-time scope
 
             try {
                 // bind parameters given the number of parameters
@@ -72,12 +74,12 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
                 for (Ast.Statement statement : ast.getStatements()) {
                     visit(statement);
                 }
-            // catches the return exception used to exit functions and return value
+                // catches the return exception used to exit functions and return value
             } catch (Return r) {
                 return r.value;
             } finally {
-                // restore the previous scope after execution
-                scope = scope.getParent();
+                // restore the caller's scope, not just the parent of the function scope
+                scope = previous;
             }
             return Environment.NIL;
         });
