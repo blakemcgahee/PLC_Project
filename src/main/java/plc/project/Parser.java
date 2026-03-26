@@ -115,21 +115,33 @@ public final class Parser {
         }
 
         List<String> parameters = new ArrayList<>();
+        List<String> parameterTypes = new ArrayList<>();
 
         // parameter list creation (identifier (',' identifier)*)?
-        if (match(Token.Type.IDENTIFIER)) {
-            parameters.add(tokens.get(-1).getLiteral());
+        if (!peek(")")) {
+            do {
+                match(Token.Type.IDENTIFIER);
+                String parameterName = tokens.get(-1).getLiteral();
 
-            while (match(",")) {
-                if (!match(Token.Type.IDENTIFIER)) {
-                    throw new ParseException("Expected IDENTIFIER after ','", tokens.getErrorIndex());
-                }
-                parameters.add(tokens.get(-1).getLiteral());
-            }
+                match(":");
+
+                match(Token.Type.IDENTIFIER);
+                String parameterType = tokens.get(-1).getLiteral();
+
+                parameters.add(parameterName);
+                parameterTypes.add(parameterType);
+            } while (match(","));
         }
 
         if (!match(")")) {
             throw new ParseException("Expected ')' after parameters", tokens.getErrorIndex());
+        }
+
+        // optional return type
+        Optional<String> returnType = Optional.empty();
+        if (match(":")) {
+            match(Token.Type.IDENTIFIER);
+            returnType = Optional.of(tokens.get(-1).getLiteral());
         }
 
         if (!match("DO")) {
@@ -149,7 +161,7 @@ public final class Parser {
             throw new ParseException("Expected END to terminate method", tokens.getErrorIndex());
         }
 
-        return new Ast.Method(name, parameters, statements);
+        return new Ast.Method(name, parameters,parameterTypes, returnType, statements);
     }
 
 
