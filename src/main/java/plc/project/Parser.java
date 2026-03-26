@@ -57,7 +57,7 @@ public final class Parser {
      * next tokens start a field, aka {@code LET}.
      */
     public Ast.Field parseField() throws ParseException {
-        // field ::= 'LET' 'CONST'? identifier ('=' expression)? ';'
+        // field ::= 'LET' 'CONST'? identifier ':' ('=' expression)? ';'
         // Additional check for "LET"
         if (!match("LET")) {
             throw new ParseException("Expected LET", tokens.getErrorIndex());
@@ -70,6 +70,16 @@ public final class Parser {
         }
         String name = tokens.get(-1).getLiteral();
 
+        // type parsing
+        if (!match(":")) {
+            throw new ParseException("Expected ':' after field name", tokens.getErrorIndex());
+        }
+
+        if (!match(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Expected type name", tokens.getErrorIndex());
+        }
+        String typeName = tokens.get(-1).getLiteral();
+
         Optional<Ast.Expression> value = Optional.empty();
         if (match("=")) {
             value = Optional.of(parseExpression());
@@ -80,7 +90,7 @@ public final class Parser {
         }
         // For: public Field(String name, boolean constant, Optional<Ast.Expression> value)
         // boolean constant tested for inclusion of CONST
-        return new Ast.Field(name, constant, value);
+        return new Ast.Field(name, typeName, constant, value);
     }
 
     /**
@@ -192,13 +202,15 @@ public final class Parser {
     public Ast.Statement.Declaration parseDeclarationStatement() throws ParseException {
         match("LET");
 
-        if (!peek(Token.Type.IDENTIFIER)) {
-            throw new ParseException("Expected identifier after LET",
-                    tokens.has(0) ? tokens.getErrorIndex() : 0);
-        }
-
-        String name = tokens.get(0).getLiteral();
         match(Token.Type.IDENTIFIER);
+        String name = tokens.get(-1).getLiteral();
+
+        Optional<String> typeName = Optional.empty();
+
+        if (match(":")) {
+            match(Token.Type.IDENTIFIER);
+            typeName = Optional.of(tokens.get(-1).getLiteral());
+        }
 
         Optional<Ast.Expression> value = Optional.empty();
         if (match("=")) {
@@ -210,7 +222,7 @@ public final class Parser {
                     tokens.has(0) ? tokens.getErrorIndex() : 0);
         }
 
-        return new Ast.Statement.Declaration(name, value);
+        return new Ast.Statement.Declaration(name, typeName, value);
     }
 
     /**
