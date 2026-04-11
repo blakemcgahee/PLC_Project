@@ -284,28 +284,64 @@ public final class Generator implements Ast.Visitor<Void> {
     // TODO: implement the five expression visitors below
     // -------------------------------------------------------------------------
 
+    // Literal will handle correct Java syntax
     @Override
     public Void visit(Ast.Expression.Literal ast) {
-        throw new UnsupportedOperationException(); //TODO
+
+        Object value = ast.getLiteral();                // retrieve the raw literal from AST node
+
+        if (value == null) {                            // explicit null handling
+            print("null");
+        } else if (value instanceof String) {           // strings require double quotes
+            print("\"" + value.toString() + "\"");
+        } else if (value instanceof Boolean) {          // booleans map directly to keyword
+            print(value.toString());
+        } else if (value instanceof Character) {        // char requires single quotes
+            print("'", value.toString(), "'");
+        } else {                                        // assume remaining types are numeric
+            print(value.toString());
+        }
+        return null;
     }
 
+    // Group will enforce correct evaluation order
     @Override
     public Void visit(Ast.Expression.Group ast) {
-        throw new UnsupportedOperationException(); //TODO
+        print("(", ast.getExpression(), ")");           // grouping via parentheses for precedence
+        return null;
     }
 
+    // Binary generates correct binary expressions with proper spacing
     @Override
-    public Void visit(Ast.Expression.Binary ast) {
-        throw new UnsupportedOperationException(); //TODO
+    public Void visit(Ast.Expression.Binary ast) {      // output operands with operator
+        print(ast.getLeft(), " ", ast.getOperator(), " ", ast.getRight());
+        return null;
     }
 
+    // Access makes determination of variable or field via receiver presence
     @Override
     public Void visit(Ast.Expression.Access ast) {
-        throw new UnsupportedOperationException(); //TODO
+        if (ast.getReceiver().isPresent()) {                    // check if this is a field access
+            print(ast.getReceiver().get(), ".", ast.getVariable().getJvmName());    // print obj ref, dot, variable name
+        } else {                                                // simple variable reference
+            print(ast.getVariable().getJvmName());              // print variable name
+        }
+        return null;
     }
 
+    // Function to handle static and receiver based calls with proper formats
     @Override
     public Void visit(Ast.Expression.Function ast) {
-        throw new UnsupportedOperationException(); //TODO
+        if (ast.getReceiver().isPresent()) {                    // check for method call
+            print(ast.getReceiver().get(), ".");                // print object reference and dot
+        }
+        print(ast.getFunction().getJvmName(), "(");             // print function name and open parenthesis
+
+        for (int i = 0; i < ast.getArguments().size(); i++) {   // iterate through function args
+            if (i > 0) print(", ");                             // comma separated arguments
+            print(ast.getArguments().get(i));                   // print each argument
+        }
+        print(")");                                             // close parenthesis to end arg list
+        return null;
     }
 }
