@@ -105,21 +105,48 @@ public final class Parser {
         }
 
         List<String> parameters = new ArrayList<>();
+        List<String> parameterTypeNames = new ArrayList<>();
 
-        // parameter list creation (identifier (',' identifier)*)?
-        if (match(Token.Type.IDENTIFIER)) {
+        if (peek(Token.Type.IDENTIFIER)) {
+            // parameter list creation (identifier (',' identifier)*)?
+            match(Token.Type.IDENTIFIER);
             parameters.add(tokens.get(-1).getLiteral());
 
+            if (match(":")) {
+                if (!match(Token.Type.IDENTIFIER)) {
+                    throw new ParseException("Expected parameter after ':'", tokens.getErrorIndex());
+                }
+                parameterTypeNames.add(tokens.get(-1).getLiteral());
+            } else {
+                parameterTypeNames.add("Any");
+            }
             while (match(",")) {
                 if (!match(Token.Type.IDENTIFIER)) {
                     throw new ParseException("Expected IDENTIFIER after ','", tokens.getErrorIndex());
                 }
                 parameters.add(tokens.get(-1).getLiteral());
+
+                if (match(":")) {
+                    if (!match(Token.Type.IDENTIFIER)) {
+                        throw new ParseException("Expected parameter after ':'", tokens.getErrorIndex());
+                    }
+                    parameterTypeNames.add(tokens.get(-1).getLiteral());
+                } else {
+                    parameterTypeNames.add("Any");
+                }
             }
         }
 
         if (!match(")")) {
             throw new ParseException("Expected ')' after parameters", tokens.getErrorIndex());
+        }
+
+        Optional<String> returnTypeName = Optional.empty();
+        if (match(":")) {
+            if (!match(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected return type after ':'", tokens.getErrorIndex());
+            }
+            returnTypeName = Optional.of(tokens.get(-1).getLiteral());
         }
 
         if (!match("DO")) {
@@ -139,7 +166,7 @@ public final class Parser {
             throw new ParseException("Expected END to terminate method", tokens.getErrorIndex());
         }
 
-        return new Ast.Method(name, parameters, statements);
+        return new Ast.Method(name, parameters, parameterTypeNames, returnTypeName, statements);
     }
 
 
@@ -200,6 +227,16 @@ public final class Parser {
         String name = tokens.get(0).getLiteral();
         match(Token.Type.IDENTIFIER);
 
+        Optional<String> typeName = Optional.empty();
+        if (match(":")) {
+            if (!peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected IDENTIFIER after ':'",
+                        tokens.has(0) ? tokens.getErrorIndex() : 0);
+            }
+            typeName = Optional.of(tokens.get(0).getLiteral());
+            match(Token.Type.IDENTIFIER);
+        }
+
         Optional<Ast.Expression> value = Optional.empty();
         if (match("=")) {
             value = Optional.of(parseExpression());
@@ -210,7 +247,7 @@ public final class Parser {
                     tokens.has(0) ? tokens.getErrorIndex() : 0);
         }
 
-        return new Ast.Statement.Declaration(name, value);
+        return new Ast.Statement.Declaration(name, typeName, value);
     }
 
     /**

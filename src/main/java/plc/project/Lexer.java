@@ -202,6 +202,19 @@ public final class Lexer {
     }
 
     public Token lexOperator() {
+
+        // Add support for logical && and || operators
+        if (peek("&", "&")) {
+            match("&");
+            match("&");
+            return chars.emit(Token.Type.OPERATOR);
+        }
+        if (peek("\\|", "\\|")) {
+            match("|");
+            match("|");
+            return chars.emit(Token.Type.OPERATOR);
+        }
+
         // Two-character comparisons: <=, >=, !=, ==
         if (peek("[<>!=]", "=")) {
             match("[<>!=]");
