@@ -70,6 +70,14 @@ public final class Parser {
         }
         String name = tokens.get(-1).getLiteral();
 
+        String typeName = "Any";
+        if (match(":")) {
+            if (!match(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected type name after ':'", tokens.getErrorIndex());
+            }
+            typeName = tokens.get(-1).getLiteral();
+        }
+
         Optional<Ast.Expression> value = Optional.empty();
         if (match("=")) {
             value = Optional.of(parseExpression());
@@ -80,7 +88,7 @@ public final class Parser {
         }
         // For: public Field(String name, boolean constant, Optional<Ast.Expression> value)
         // boolean constant tested for inclusion of CONST
-        return new Ast.Field(name, constant, value);
+        return new Ast.Field(name, typeName, constant, value);
     }
 
     /**
