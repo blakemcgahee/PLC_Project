@@ -210,8 +210,8 @@ public final class Lexer {
             return chars.emit(Token.Type.OPERATOR);
         }
         if (peek("\\|", "\\|")) {
-            match("|");
-            match("|");
+            match("\\|");
+            match("\\|");
             return chars.emit(Token.Type.OPERATOR);
         }
 

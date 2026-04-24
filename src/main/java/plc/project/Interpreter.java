@@ -236,13 +236,13 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
         // AND/OR use short circuit evaluation, we only evaluate the RHS if necessary.
         // Per the spec, both sides must be Booleans.
-        if (op.equals("AND")) {
+        if (op.equals("&&") || op.equals("AND")) {
             boolean lhs = requireType(Boolean.class, visit(ast.getLeft()));
             // Short circuit: if LHS is false, the result is always false - skip RHS
             if (!lhs) return Environment.create(false);
             boolean rhs = requireType(Boolean.class, visit(ast.getRight()));
             return Environment.create(rhs);
-        } else if (op.equals("OR")) {
+        } else if (op.equals("||") || op.equals("OR")) {
             boolean lhs = requireType(Boolean.class, visit(ast.getLeft()));
             // Short circuit: if LHS is true, the result is always true - skip RHS
             if (lhs) return Environment.create(true);
