@@ -70,13 +70,22 @@ public final class Parser {
         }
         String name = tokens.get(-1).getLiteral();
 
+        /*
         String typeName = "Any";
         if (match(":")) {
             if (!match(Token.Type.IDENTIFIER)) {
                 throw new ParseException("Expected type name after ':'", tokens.getErrorIndex());
             }
             typeName = tokens.get(-1).getLiteral();
+        }*/
+
+        if (!match(":")) {
+            throw new ParseException("Expected ':' after field name", tokens.getErrorIndex());
         }
+        if (!match(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Expected type name after ':'", tokens.getErrorIndex());
+        }
+        String typeName = tokens.get(-1).getLiteral();
 
         Optional<Ast.Expression> value = Optional.empty();
         if (match("=")) {
@@ -120,6 +129,14 @@ public final class Parser {
             match(Token.Type.IDENTIFIER);
             parameters.add(tokens.get(-1).getLiteral());
 
+            if (!match(":")) {
+                throw new ParseException("Expected ':' after parameter name", tokens.getErrorIndex());
+            }
+            if (!match(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected parameter name after ':'", tokens.getErrorIndex());
+            }
+            parameterTypeNames.add(tokens.get(-1).getLiteral());
+            /*
             if (match(":")) {
                 if (!match(Token.Type.IDENTIFIER)) {
                     throw new ParseException("Expected parameter after ':'", tokens.getErrorIndex());
@@ -127,13 +144,14 @@ public final class Parser {
                 parameterTypeNames.add(tokens.get(-1).getLiteral());
             } else {
                 parameterTypeNames.add("Any");
-            }
+            }*/
             while (match(",")) {
                 if (!match(Token.Type.IDENTIFIER)) {
                     throw new ParseException("Expected IDENTIFIER after ','", tokens.getErrorIndex());
                 }
                 parameters.add(tokens.get(-1).getLiteral());
 
+                /*
                 if (match(":")) {
                     if (!match(Token.Type.IDENTIFIER)) {
                         throw new ParseException("Expected parameter after ':'", tokens.getErrorIndex());
@@ -141,7 +159,14 @@ public final class Parser {
                     parameterTypeNames.add(tokens.get(-1).getLiteral());
                 } else {
                     parameterTypeNames.add("Any");
+                }*/
+                if (!match(":")) {
+                    throw new ParseException("Expected ':' after parameter name", tokens.getErrorIndex());
                 }
+                if (!match(Token.Type.IDENTIFIER)) {
+                    throw new ParseException("Expected parameter name after ':'", tokens.getErrorIndex());
+                }
+                parameterTypeNames.add(tokens.get(-1).getLiteral());
             }
         }
 
@@ -158,7 +183,8 @@ public final class Parser {
         }
 
         if (!match("DO")) {
-            throw new ParseException("Expected DO before statements", tokens.getErrorIndex());
+            throw new ParseException("Expected DO before statements",
+                    tokens.has(0) ? tokens.get(0).getIndex() : tokens.getErrorIndex());
         }
 
         // Potential list of statement -> statement*
@@ -433,6 +459,15 @@ public final class Parser {
         Ast.Expression result = parseComparisonExpression();
 
         // 2. Loop while we see specific operators for this level
+        // Try match instead of peek to make sure exact operator is consumed as opposed
+        // to generic match(Token.Type.OPERATOR)
+        while (match("&&") || match("||")) {
+            String operator = tokens.get(-1).getLiteral();
+            Ast.Expression right = parseComparisonExpression();
+            result = new Ast.Expression.Binary(operator, result, right);
+        }
+
+        /*
         while (peek("&&") || peek("||")) {
             String operator = tokens.get(0).getLiteral();
             match(Token.Type.OPERATOR); // Advance past the operator
@@ -442,7 +477,7 @@ public final class Parser {
 
             // 4. Wrap in a Binary Expression
             result = new Ast.Expression.Binary(operator, result, right);
-        }
+        }*/
         return result;
     }
 

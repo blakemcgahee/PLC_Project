@@ -229,6 +229,13 @@ public final class Lexer {
             return chars.emit(Token.Type.OPERATOR);
         }
 
+        // Tokenize vertical tab and form feed
+        if (peek("[\\u000B\\u000C\\f]")) {
+            match("[\\u000B\\u000C\\f]");
+            return chars.emit(Token.Type.OPERATOR);
+        }
+
+
         // If we get here, it's an invalid character
         throw new ParseException("Invalid character", chars.index);
     }

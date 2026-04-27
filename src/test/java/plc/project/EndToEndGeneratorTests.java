@@ -144,6 +144,16 @@ public class EndToEndGeneratorTests {
                         // "Ben" + 10
                         "\"Ben\" + 10",
                         "\"Ben\" + 10"
+                ),
+                Arguments.of("Comparison",
+                        // 1 > 10
+                        "1 > 10",
+                        "1 > 10"
+                ),
+                Arguments.of("Addition",
+                        // 1 + 10
+                        "1 + 10",
+                        "1 + 10"
                 )
         );
     }
